@@ -4,7 +4,7 @@
   "abbrev": "CL",
   "version": "0.3.4",
   "description": "Host for CLAP audio plugins",
-  "author": "Move Anything",
+  "author": "charlesvestal",
   "license": "MIT",
   "ui": "ui.js",
   "dsp": "dsp.so",
