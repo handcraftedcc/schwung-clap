@@ -14,7 +14,7 @@ A Move Anything module that hosts arbitrary CLAP plugins in-process, usable as a
 
 ## Features
 
-- Load any CLAP plugin from `/data/UserData/move-anything/modules/clap/plugins/`
+- Load any CLAP plugin from `/data/UserData/move-anything/modules/sound_generators/clap/plugins/`
 - Browse and select plugins via the QuickJS UI
 - Control plugin parameters via encoder banks
 - Usable as sound generator in Signal Chain patches
@@ -59,7 +59,7 @@ For complex synths like Surge XT or Vital, the effort to resolve glibc/libstdc++
 
 ## Usage
 
-1. Copy `.clap` plugin files to `/data/UserData/move-anything/modules/clap/plugins/` on the Move
+1. Copy `.clap` plugin files to `/data/UserData/move-anything/modules/sound_generators/clap/plugins/` on the Move
 2. If plugins need shared libraries, copy `.so` files to the same directory
 3. Select the CLAP module from the host menu
 4. Use the UI to browse and load plugins
