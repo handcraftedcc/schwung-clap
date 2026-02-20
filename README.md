@@ -1,14 +1,14 @@
-# Move Anything CLAP Host Module
+# Move Everything CLAP Host Module
 
 > **⚠️ Proof of Concept**
 >
 > This module is experimental. There are currently no known released third-party CLAP plugins that can be loaded without modification. Most plugins require rebuilding from source with headless options and ARM64 cross-compilation. See "Plugin Compatibility" below for details.
 
-A Move Anything module that hosts arbitrary CLAP plugins in-process, usable as a standalone sound generator or as a component in Signal Chain.
+A Move Everything module that hosts arbitrary CLAP plugins in-process, usable as a standalone sound generator or as a component in Signal Chain.
 
 ## Prerequisites
 
-- [Move Anything](https://github.com/charlesvestal/move-anything) installed on your Ableton Move
+- [Move Everything](https://github.com/charlesvestal/move-anything) installed on your Ableton Move
 - SSH access enabled: http://move.local/development/ssh
 - ARM64 Linux CLAP plugins (see "Plugin Compatibility" below)
 
@@ -72,3 +72,10 @@ See [BUILDING.md](BUILDING.md) for detailed build instructions for specific plug
 ## License
 
 MIT License - see LICENSE file
+
+## AI Assistance Disclaimer
+
+This module is part of Move Everything and was developed with AI assistance, including Claude, Codex, and other AI assistants.
+
+All architecture, implementation, and release decisions are reviewed by human maintainers.  
+AI-assisted content may still contain errors, so please validate functionality, security, and license compatibility before production use.
