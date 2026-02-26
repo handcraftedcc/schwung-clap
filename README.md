@@ -69,6 +69,14 @@ For complex synths like Surge XT or Vital, the effort to resolve glibc/libstdc++
 
 See [BUILDING.md](BUILDING.md) for detailed build instructions for specific plugin frameworks (SA_Toolkit, LSP Plugins, clap-plugins, etc.).
 
+## Bundled Plugins
+
+### Airwindows
+
+This module bundles [Airwindows](https://github.com/airwindows/airwindows) by Chris Johnson — 498 high-quality open source audio effects as a single CLAP plugin. The CLAP build is from [airwin2rack](https://github.com/baconpaul/airwin2rack) by Bacon Pauls.
+
+Airwindows is licensed under the MIT License. See [LICENSES/AIRWINDOWS.txt](LICENSES/AIRWINDOWS.txt) for full license text.
+
 ## License
 
 MIT License - see LICENSE file
