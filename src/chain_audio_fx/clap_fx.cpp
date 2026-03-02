@@ -396,6 +396,9 @@ static int json_extract_string(const char *json, const char *key, char *out, int
 static void v2_apply_state_json(clap_fx_instance_t *inst, const char *json) {
     if (!inst || !json || !json[0]) return;
 
+    /* State restore must win over any prior debounced browser selection. */
+    inst->pending_load_time = 0;
+
     /* Restore plugin selection first, so param indices map to the right plugin. */
     char plugin_id[256] = "";
     if (json_extract_string(json, "plugin_id", plugin_id, sizeof(plugin_id)) == 0 &&
@@ -403,6 +406,21 @@ static void v2_apply_state_json(clap_fx_instance_t *inst, const char *json) {
         if (strcmp(plugin_id, inst->selected_plugin_id) != 0) {
             v2_load_plugin_by_id(inst, plugin_id);
         }
+    }
+
+    /* Keep browser selection aligned to the currently loaded plugin even when
+       plugin_id matched and we skipped an explicit reload above. */
+    if (inst->loaded_plugin_index >= 0 && inst->loaded_plugin_index < inst->plugin_list.count) {
+        int display_idx = inst->browser_index.raw_to_display[inst->loaded_plugin_index];
+        if (display_idx >= 0) {
+            inst->selected_plugin_index = display_idx;
+            inst->selected_category_index =
+                clap_fx_category_index_for_display(&inst->browser_index, display_idx);
+        }
+        strncpy(inst->selected_plugin_id,
+                inst->plugin_list.items[inst->loaded_plugin_index].id,
+                sizeof(inst->selected_plugin_id) - 1);
+        inst->selected_plugin_id[sizeof(inst->selected_plugin_id) - 1] = '\0';
     }
 
     if (!inst->current_plugin.plugin) return;
