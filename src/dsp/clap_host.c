@@ -550,6 +550,7 @@ int clap_load_plugin(const char *path, int plugin_index, clap_instance_t *out) {
     out->activated = true;
     out->processing = true;
     strncpy(out->path, path, sizeof(out->path) - 1);
+    pthread_mutex_init(&out->param_mutex, NULL);
 
     return 0;
 }
@@ -572,6 +573,7 @@ void clap_unload_plugin(clap_instance_t *inst) {
 
     if (entry) entry->deinit();
     if (inst->handle) dlclose(inst->handle);
+    pthread_mutex_destroy(&inst->param_mutex);
 
     memset(inst, 0, sizeof(*inst));
 }
@@ -609,6 +611,16 @@ static const clap_event_header_t *s_events_get(const clap_input_events_t *list, 
 }
 
 static bool s_empty_push(const clap_output_events_t *list, const clap_event_header_t *event) { return true; }
+
+/* One-event input list for params->flush in control-thread set_param calls */
+static uint32_t s_single_event_size(const clap_input_events_t *list) {
+    return list && list->ctx ? 1u : 0u;
+}
+
+static const clap_event_header_t *s_single_event_get(const clap_input_events_t *list, uint32_t index) {
+    if (!list || !list->ctx || index != 0) return NULL;
+    return (const clap_event_header_t *)list->ctx;
+}
 
 /* Convert MIDI queue to CLAP note events */
 static void prepare_midi_events(void) {
@@ -681,6 +693,27 @@ static void prepare_param_events(clap_instance_t *inst) {
     }
 
     inst->param_queue_count = 0;
+}
+
+static void queue_param_change(clap_instance_t *inst, uint32_t param_id, double value) {
+    /* Coalesce by param id so repeated knob turns keep only the latest target. */
+    for (int i = inst->param_queue_count - 1; i >= 0; i--) {
+        if (inst->param_queue[i].param_id == param_id) {
+            inst->param_queue[i].value = value;
+            return;
+        }
+    }
+
+    if (inst->param_queue_count >= CLAP_MAX_PARAM_CHANGES) {
+        memmove(&inst->param_queue[0],
+                &inst->param_queue[1],
+                sizeof(inst->param_queue[0]) * (CLAP_MAX_PARAM_CHANGES - 1));
+        inst->param_queue_count = CLAP_MAX_PARAM_CHANGES - 1;
+    }
+
+    inst->param_queue[inst->param_queue_count].param_id = param_id;
+    inst->param_queue[inst->param_queue_count].value = value;
+    inst->param_queue_count++;
 }
 
 static void ensure_buffers(int frames) {
@@ -757,6 +790,7 @@ int clap_process_block(clap_instance_t *inst, const float *in, float *out, int f
     prepare_midi_events();
 
     /* Prepare param events from instance queue */
+    pthread_mutex_lock(&inst->param_mutex);
     prepare_param_events(inst);
 
     /* Event lists with queued MIDI and param events */
@@ -785,6 +819,7 @@ int clap_process_block(clap_instance_t *inst, const float *in, float *out, int f
 
     /* Process */
     clap_process_status status = plugin->process(plugin, &process);
+    pthread_mutex_unlock(&inst->param_mutex);
     if (status == CLAP_PROCESS_ERROR) {
         return -1;
     }
@@ -843,13 +878,41 @@ int clap_param_set(clap_instance_t *inst, int index, double value) {
     clap_param_info_t info;
     if (!params->get_info(plugin, index, &info)) return -1;
 
-    /* Queue the param change for next process block */
-    if (inst->param_queue_count < CLAP_MAX_PARAM_CHANGES) {
-        inst->param_queue[inst->param_queue_count].param_id = info.id;
-        inst->param_queue[inst->param_queue_count].value = value;
-        inst->param_queue_count++;
+    pthread_mutex_lock(&inst->param_mutex);
+
+    /* Queue for audio-thread delivery via process() events. */
+    queue_param_change(inst, info.id, value);
+
+    /* Also flush once on the control thread for plugins that consume
+       automation through params->flush instead of process() input events. */
+    if (params->flush) {
+        clap_event_param_value_t evt;
+        memset(&evt, 0, sizeof(evt));
+        evt.header.size = sizeof(clap_event_param_value_t);
+        evt.header.time = 0;
+        evt.header.space_id = CLAP_CORE_EVENT_SPACE_ID;
+        evt.header.type = CLAP_EVENT_PARAM_VALUE;
+        evt.param_id = info.id;
+        evt.cookie = NULL;
+        evt.note_id = -1;
+        evt.port_index = -1;
+        evt.channel = -1;
+        evt.key = -1;
+        evt.value = value;
+
+        clap_input_events_t in_events = {
+            .ctx = &evt,
+            .size = s_single_event_size,
+            .get = s_single_event_get
+        };
+        clap_output_events_t out_events = {
+            .ctx = NULL,
+            .try_push = s_empty_push
+        };
+        params->flush(plugin, &in_events, &out_events);
     }
 
+    pthread_mutex_unlock(&inst->param_mutex);
     return 0;
 }
 
@@ -864,10 +927,21 @@ double clap_param_get(clap_instance_t *inst, int index) {
     clap_param_info_t info;
     if (!params->get_info(plugin, index, &info)) return 0.0;
 
+    pthread_mutex_lock(&inst->param_mutex);
+    for (int i = inst->param_queue_count - 1; i >= 0; i--) {
+        if (inst->param_queue[i].param_id == info.id) {
+            double queued = inst->param_queue[i].value;
+            pthread_mutex_unlock(&inst->param_mutex);
+            return queued;
+        }
+    }
+
     double value = 0.0;
     if (params->get_value(plugin, info.id, &value)) {
+        pthread_mutex_unlock(&inst->param_mutex);
         return value;
     }
+    pthread_mutex_unlock(&inst->param_mutex);
     return info.default_value;
 }
 

@@ -9,6 +9,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <pthread.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,6 +58,7 @@ typedef struct clap_instance {
     /* Per-instance param change queue */
     clap_param_change_t param_queue[CLAP_MAX_PARAM_CHANGES];
     int param_queue_count;
+    pthread_mutex_t param_mutex;
 } clap_instance_t;
 
 /*
